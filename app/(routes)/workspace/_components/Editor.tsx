@@ -29,13 +29,22 @@ const Editor = ({
   onSaveTrigger,
   fileId,
   fileData,
+  onFileUpdate,
+  onSavingStateChange,
 }: {
   onSaveTrigger: any;
   fileId: any;
   fileData: any;
+  onFileUpdate?: (data: WorkspaceFile) => void;
+  onSavingStateChange?: (state: "idle" | "saving" | "saved" | "error") => void;
 }) => {
   const ref = useRef<EditorJs>();
   const [document, setDocument] = useState(rawDocument);
+  const localKey = `workspace:${fileId}:document`;
+
+  // autosave debounce timer and retry control
+  const idleDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const retryCountRef = useRef(0);
 
   const saveDocument = async (id: string, data: any) => {
     const res = await fetch(`/api/workspace/${id}`, {
@@ -62,7 +71,75 @@ const Editor = ({
         list: List,
         checklist: checkList,
       },
-      data: fileData && fileData.document ? fileData.document : document,
+      data:
+        // Prefer locally cached unsaved data first
+        (typeof window !== "undefined"
+          ? (() => {
+              try {
+                const cached = window.localStorage.getItem(localKey);
+                return cached ? JSON.parse(cached) : null;
+              } catch {
+                return null;
+              }
+            })()
+          : null) || (fileData && fileData.document ? fileData.document : document),
+      onChange: async () => {
+        if (!ref.current) return;
+        const data = await ref.current.save();
+        try {
+          // Cache locally for resilience across navigation
+          window.localStorage.setItem(localKey, JSON.stringify(data));
+        } catch {}
+
+        // debounce autosave (3-5s of inactivity)
+        if (idleDebounceRef.current) clearTimeout(idleDebounceRef.current);
+        idleDebounceRef.current = setTimeout(async () => {
+          if (!ref.current) return;
+          onSavingStateChange?.("saving");
+          try {
+            const latest = await ref.current.save();
+            const updatedFile = await saveDocument(fileId, latest);
+            onFileUpdate?.(updatedFile as WorkspaceFile);
+            onSavingStateChange?.("saved");
+            retryCountRef.current = 0;
+            // clear cache after successful save to keep it lean
+            try {
+              window.localStorage.removeItem(localKey);
+            } catch {}
+          } catch (e) {
+            onSavingStateChange?.("error");
+            // retry with exponential backoff up to 3 attempts
+            const retries = Math.min(retryCountRef.current + 1, 3);
+            retryCountRef.current = retries;
+            const backoff = Math.pow(2, retries - 1) * 1000; // 1s,2s,4s
+            setTimeout(() => {
+              // trigger another debounce run to retry
+              if (ref.current) {
+                // simulate another change to kick autosave
+                // by calling the same timeout block directly
+                if (idleDebounceRef.current)
+                  clearTimeout(idleDebounceRef.current);
+                idleDebounceRef.current = setTimeout(async () => {
+                  if (!ref.current) return;
+                  onSavingStateChange?.("saving");
+                  try {
+                    const latest2 = await ref.current.save();
+                    const updatedFile2 = await saveDocument(fileId, latest2);
+                    onFileUpdate?.(updatedFile2 as WorkspaceFile);
+                    onSavingStateChange?.("saved");
+                    retryCountRef.current = 0;
+                    try {
+                      window.localStorage.removeItem(localKey);
+                    } catch {}
+                  } catch {
+                    onSavingStateChange?.("error");
+                  }
+                }, 0);
+              }
+            }, backoff);
+          }
+        }, 3500); // ~3.5s idle
+      },
     });
     editor.isReady.then(() => {
       ref.current = editor;
@@ -71,10 +148,16 @@ const Editor = ({
 
   const onDocumentSave = useCallback(async () => {
     if (!ref.current) return;
+    onSavingStateChange?.("saving");
     const savedData = await ref.current.save();
-    await saveDocument(fileId, savedData);
+    const updatedFile = await saveDocument(fileId, savedData);
+    onFileUpdate?.(updatedFile as WorkspaceFile);
+    onSavingStateChange?.("saved");
+    try {
+      window.localStorage.removeItem(localKey);
+    } catch {}
     toast.success("Document Saved");
-  }, [fileId]);
+  }, [fileId, onFileUpdate]);
 
   useEffect(() => {
     if (fileData) {

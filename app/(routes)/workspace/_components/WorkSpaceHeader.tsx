@@ -31,7 +31,7 @@ const WorkSpaceHeader = ({
   Tabs,
   setActiveTab,
   activeTab,
-  onSave,
+  savingState,
   file,
 }: any) => {
   return (
@@ -99,12 +99,21 @@ const WorkSpaceHeader = ({
 
       {/* right most */}
       <div className="w-full space-x-4  flex items-center  justify-end">
-        
-        <div
-          onClick={() => onSave()}
-          className="rounded-sm flex text-sm items-center bg-blue-700 hover:bg-blue-800 hover:text-white cursor-pointer px-2 py-1"
-        >
-          <Save size={20} />
+        {/* Saving indicator replaces manual Save button */}
+        <div className="rounded-sm flex items-center text-xs text-neutral-300">
+          {savingState === "saving" && (
+            <span className="flex items-center">
+              <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-blue-400" />
+              Saving…
+            </span>
+          )}
+          {savingState === "saved" && (
+            <span className="text-neutral-400">Saved</span>
+          )}
+          {savingState === "error" && (
+            <span className="text-red-400">Save failed, retrying…</span>
+          )}
+          {savingState === "idle" && <span className="text-neutral-500">Idle</span>}
         </div>
         <div
           onClick={() => {

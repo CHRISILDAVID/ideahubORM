@@ -20,12 +20,21 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       fileName?: string;
       archived?: boolean;
     };
+    // Only include keys that are provided to avoid unintentionally nulling fields
+    const data: Record<string, any> = {};
+    if (typeof document !== "undefined") data.document = document as any;
+    if (typeof whiteboard !== "undefined") data.whiteboard = whiteboard as any;
+    if (typeof fileName !== "undefined") data.fileName = fileName;
+    if (typeof archived !== "undefined") data.archived = archived;
+
     const updated = await prisma.file.update({
       where: { id: params.id },
-      data: { document: document as any, whiteboard: whiteboard as any, fileName, archived },
+      data,
     });
+    console.log("Update successful:", updated);
     return NextResponse.json(updated);
   } catch (e) {
+    console.error("Update failed:", e);
     return NextResponse.json({ error: "Failed to update" }, { status: 500 });
   }
 }

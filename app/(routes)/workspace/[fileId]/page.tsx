@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -45,7 +45,13 @@ const Workspace = ({ params }: any) => {
   ];
 
   const [activeTab, setActiveTab] = useState(Tabs[1].name);
-  const [triggerSave, setTriggerSave] = useState(false);
+  const [savingState, setSavingState] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+
+  const handleFileUpdate = useCallback((data: WorkspaceFile) => {
+    setfileData(data);
+  }, []);
 
   return (
     <div className="overflow-hidden w-full">
@@ -53,7 +59,7 @@ const Workspace = ({ params }: any) => {
         Tabs={Tabs}
         setActiveTab={setActiveTab}
         activeTab={activeTab}
-        onSave={() => setTriggerSave(!triggerSave)}
+        savingState={savingState}
         file={fileData}
       />
       {activeTab === "Document" ? (
@@ -64,9 +70,10 @@ const Workspace = ({ params }: any) => {
         >
           {fileData && (
             <Editor
-              onSaveTrigger={triggerSave}
+              onSaveTrigger={false}
               fileId={params.fileId}
               fileData={fileData as any}
+              onSavingStateChange={setSavingState}
             />
           )}
         </div>
@@ -80,9 +87,11 @@ const Workspace = ({ params }: any) => {
           <ResizablePanel defaultSize={50} minSize={40} collapsible={false}>
             {fileData && (
               <Editor
-                onSaveTrigger={triggerSave}
+                onSaveTrigger={false}
                 fileId={params.fileId}
                 fileData={fileData as any}
+                onFileUpdate={handleFileUpdate}
+                onSavingStateChange={setSavingState}
               />
             )}
           </ResizablePanel>
@@ -90,9 +99,11 @@ const Workspace = ({ params }: any) => {
           <ResizablePanel defaultSize={50} minSize={45}>
             {fileData && (
               <Canvas
-                onSaveTrigger={triggerSave}
+                onSaveTrigger={false}
                 fileId={params.fileId}
                 fileData={fileData as any}
+                onFileUpdate={handleFileUpdate}
+                onSavingStateChange={setSavingState}
               />
             )}
           </ResizablePanel>
@@ -105,9 +116,11 @@ const Workspace = ({ params }: any) => {
         >
           {fileData && (
             <Canvas
-              onSaveTrigger={triggerSave}
+              onSaveTrigger={false}
               fileId={params.fileId}
               fileData={fileData as any}
+              onFileUpdate={handleFileUpdate}
+              onSavingStateChange={setSavingState}
             />
           )}
         </div>

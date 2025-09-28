@@ -40,8 +40,8 @@ const WorkSpaceHeader = ({
       <div className="flex space-x-2 items-center justify-start w-full">
         <div className="flex space-x-2 items-center">
           <Image
-            src="/logo.svg"
-            alt="logo"
+            src="/IDEAHUB.svg"
+            alt="IDEAHUB"
             width={32}
             height={32}
             className="h-8 w-8"
@@ -100,7 +100,7 @@ const WorkSpaceHeader = ({
       {/* right most */}
       <div className="w-full space-x-4  flex items-center  justify-end">
         {/* Saving indicator replaces manual Save button */}
-        <div className="rounded-sm flex items-center text-xs text-neutral-300">
+        <div className="rounded-sm flex items-center text-xs text-neutral-300 min-w-[80px] justify-end">
           {savingState === "saving" && (
             <span className="flex items-center">
               <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-blue-400" />
@@ -113,7 +113,7 @@ const WorkSpaceHeader = ({
           {savingState === "error" && (
             <span className="text-red-400">Save failed, retrying…</span>
           )}
-          {savingState === "idle" && <span className="text-neutral-500">Idle</span>}
+          {!savingState && <span className="text-neutral-500">Idle</span>}
         </div>
         <div
           onClick={() => {

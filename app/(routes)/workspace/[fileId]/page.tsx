@@ -9,11 +9,27 @@ import WorkSpaceHeader from "../_components/WorkSpaceHeader";
 import dynamic from "next/dynamic";
 import { WorkspaceFile } from "../_types";
 
-const Editor = dynamic(() => import("../_components/Editor"), {
+type SavingState = "idle" | "saving" | "saved" | "error";
+type EditorComponentProps = {
+  onSaveTrigger: any;
+  fileId: any;
+  fileData: any;
+  onFileUpdate?: (data: WorkspaceFile) => void;
+  onSavingStateChange?: (state: SavingState) => void;
+};
+type CanvasComponentProps = {
+  onSaveTrigger: any;
+  fileId: string;
+  fileData: any;
+  onFileUpdate?: (data: WorkspaceFile) => void;
+  onSavingStateChange?: (state: SavingState) => void;
+};
+
+const Editor = dynamic<EditorComponentProps>(() => import("../_components/Editor"), {
   ssr: false,
 });
 
-const Canvas = dynamic(() => import("../_components/Canvas"), {
+const Canvas = dynamic<CanvasComponentProps>(() => import("../_components/Canvas"), {
   ssr: false,
 });
 

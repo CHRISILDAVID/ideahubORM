@@ -49,8 +49,8 @@ const Sidebar = () => {
       <div className="mb-8 space-y-2">
         <div className="flex items-center gap-2">
           <Image
-            src="/logo.svg"
-            alt="logo"
+            src="/IDEAHUB.svg"
+            alt="IDEAHUB"
             width={32}
             height={32}
             className="h-8 w-8"

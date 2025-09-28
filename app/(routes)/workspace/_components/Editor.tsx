@@ -30,20 +30,22 @@ const Editor = ({
   fileId,
   fileData,
   onFileUpdate,
-  onSavingStateChange,
 }: {
   onSaveTrigger: any;
   fileId: any;
   fileData: any;
   onFileUpdate?: (data: WorkspaceFile) => void;
-  onSavingStateChange?: (state: "idle" | "saving" | "saved" | "error") => void;
 }) => {
   const ref = useRef<EditorJs>();
+  const isInitialized = useRef(false);
+  const holderIdRef = useRef<string>(`editorjs-${fileId}-${Math.random()
+    .toString(36)
+    .slice(2)}`);
   const [document, setDocument] = useState(rawDocument);
-  const localKey = `workspace:${fileId}:document`;
 
-  // autosave debounce timer and retry control
+  const localKey = `workspace:${fileId}:document`;
   const idleDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const localWriteDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const retryCountRef = useRef(0);
 
   const saveDocument = async (id: string, data: any) => {
@@ -57,9 +59,11 @@ const Editor = ({
   };
 
   const initEditor = useCallback(() => {
+    // Avoid initializing more than once per mount
+    if (isInitialized.current || ref.current) return;
     const editor = new EditorJs({
-      holder: "editorjs",
-      placeholder: "Let`s write an awesome story!",
+      holder: holderIdRef.current,
+      placeholder: "Start cooking...",
       tools: {
         header: {
           // @ts-ignore
@@ -86,76 +90,43 @@ const Editor = ({
       onChange: async () => {
         if (!ref.current) return;
         const data = await ref.current.save();
-        try {
-          // Cache locally for resilience across navigation
-          window.localStorage.setItem(localKey, JSON.stringify(data));
-        } catch {}
+        // Debounce local cache write to avoid heavy frequent JSON stringify
+        if (localWriteDebounceRef.current) clearTimeout(localWriteDebounceRef.current);
+        localWriteDebounceRef.current = setTimeout(() => {
+          try {
+            // Always overwrite the cache with the latest snapshot
+            window.localStorage.setItem(localKey, JSON.stringify(data));
+          } catch {}
+        }, 300);
 
-        // debounce autosave (3-5s of inactivity)
         if (idleDebounceRef.current) clearTimeout(idleDebounceRef.current);
         idleDebounceRef.current = setTimeout(async () => {
           if (!ref.current) return;
-          onSavingStateChange?.("saving");
           try {
             const latest = await ref.current.save();
-            const updatedFile = await saveDocument(fileId, latest);
-            onFileUpdate?.(updatedFile as WorkspaceFile);
-            onSavingStateChange?.("saved");
+            await saveDocument(fileId, latest);
             retryCountRef.current = 0;
-            // clear cache after successful save to keep it lean
             try {
               window.localStorage.removeItem(localKey);
             } catch {}
           } catch (e) {
-            onSavingStateChange?.("error");
-            // retry with exponential backoff up to 3 attempts
             const retries = Math.min(retryCountRef.current + 1, 3);
             retryCountRef.current = retries;
-            const backoff = Math.pow(2, retries - 1) * 1000; // 1s,2s,4s
-            setTimeout(() => {
-              // trigger another debounce run to retry
-              if (ref.current) {
-                // simulate another change to kick autosave
-                // by calling the same timeout block directly
-                if (idleDebounceRef.current)
-                  clearTimeout(idleDebounceRef.current);
-                idleDebounceRef.current = setTimeout(async () => {
-                  if (!ref.current) return;
-                  onSavingStateChange?.("saving");
-                  try {
-                    const latest2 = await ref.current.save();
-                    const updatedFile2 = await saveDocument(fileId, latest2);
-                    onFileUpdate?.(updatedFile2 as WorkspaceFile);
-                    onSavingStateChange?.("saved");
-                    retryCountRef.current = 0;
-                    try {
-                      window.localStorage.removeItem(localKey);
-                    } catch {}
-                  } catch {
-                    onSavingStateChange?.("error");
-                  }
-                }, 0);
-              }
-            }, backoff);
           }
-        }, 3500); // ~3.5s idle
+        }, 1500);
       },
     });
     editor.isReady.then(() => {
       ref.current = editor;
+      isInitialized.current = true;
     });
   }, [document, fileData]);
 
   const onDocumentSave = useCallback(async () => {
     if (!ref.current) return;
-    onSavingStateChange?.("saving");
     const savedData = await ref.current.save();
     const updatedFile = await saveDocument(fileId, savedData);
     onFileUpdate?.(updatedFile as WorkspaceFile);
-    onSavingStateChange?.("saved");
-    try {
-      window.localStorage.removeItem(localKey);
-    } catch {}
     toast.success("Document Saved");
   }, [fileId, onFileUpdate]);
 
@@ -164,6 +135,18 @@ const Editor = ({
       initEditor();
     }
   }, [fileData, initEditor]);
+
+  // Cleanup on unmount to avoid duplicate toolbars/blocks on remount
+  useEffect(() => {
+    return () => {
+      try {
+        ref.current?.destroy?.();
+      } catch {}
+      // reset flags
+      ref.current = undefined as unknown as EditorJs;
+      isInitialized.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -174,8 +157,8 @@ const Editor = ({
     <div className="p-2">
       <div
         className="text-white selection:text-black selection:bg-neutral-400 overflow-x-hidden overflow-y-auto w-full pr-4 pl-2 h-[85vh] mb-4"
-        id="editorjs"
-        key={"editorjs"}
+        id={holderIdRef.current}
+        key={holderIdRef.current}
       ></div>
     </div>
   );

@@ -32,20 +32,3 @@ Copy the `id` from the response and open:
 http://localhost:3000/workspace/<id>
 
 You can now build your app on top of the workspace component.
-
-## Autosave and Local Cache
-
-The workspace supports autosave and local caching for both the Document editor and the Canvas:
-
-- Inactivity autosave: Changes are saved automatically to the database after ~3.5 seconds of inactivity.
-- Local cache: Changes are stored in the browser's localStorage as you type/draw so transient navigation or network issues won't lose your work.
-- Restore order: On load, the app prefers any locally cached unsaved content first; after a successful save, the cache is cleared.
-- Saving indicator: The header shows "Saving…" during autosave, "Saved" on success, and "Save failed, retrying…" on errors.
-- Retry: Failed autosaves retry with exponential backoff up to 3 attempts.
-
-Local cache keys (remove via DevTools if needed):
-
-- `workspace:<fileId>:document`
-- `workspace:<fileId>:whiteboard`
-
-Note: In private browsing or when storage access is blocked, local caching may not be available.
